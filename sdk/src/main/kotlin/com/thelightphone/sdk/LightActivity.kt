@@ -1,7 +1,6 @@
 package com.thelightphone.sdk
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -53,22 +52,10 @@ class LightActivity internal constructor() : ComponentActivity() {
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
 
-        val initialClassName = packageManager
-            .getActivityInfo(componentName, PackageManager.GET_META_DATA)
-            .metaData
-            ?.getString("com.thelightphone.sdk.initialScreen")
-            ?: throw IllegalStateException(
-                "LightActivity requires meta-data 'com.thelightphone.sdk.initialScreen' " +
-                        "pointing to a SimpleLightScreen subclass"
-            )
+        val factory = LightSdkRegistry.initialScreenFactory
+            ?: throw IllegalStateException("No class annotated with @InitialScreen found")
 
-        val initial = try {
-            Class.forName(initialClassName)
-                .getDeclaredConstructor(SealedLightActivity::class.java)
-                .newInstance(SealedLightActivity(this)) as SimpleLightScreen
-        } catch (e: Exception) {
-            throw IllegalStateException("Could not instantiate initial screen: $initialClassName", e)
-        }
+        val initial = factory(SealedLightActivity(this))
 
         backStack.add(initial)
         initial.notifyWillShow()

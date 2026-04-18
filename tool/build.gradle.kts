@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
     alias(libs.plugins.light.sdk)
 }
 
@@ -18,6 +19,8 @@ android {
         targetSdk = rootProject.ext["targetSdk"] as Int
         versionCode = 1
         versionName = "1.0"
+
+        manifestPlaceholders["sdkVersion"] = property("sdkVersion") as String
     }
 
     lint {

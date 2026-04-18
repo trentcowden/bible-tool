@@ -32,6 +32,7 @@ class LightSdkPlugin : Plugin<Project> {
             "org.jetbrains.kotlin.jvm",
             "org.jetbrains.kotlin.plugin.compose",
             "org.jetbrains.kotlin.plugin.serialization",
+            "com.google.devtools.ksp",
             "com.thelightphone.light-sdk",
         )
 
@@ -45,6 +46,8 @@ class LightSdkPlugin : Plugin<Project> {
             "kotlinKlib",
             "kotlinNative",
             "kotlinInternalAbi",
+            "ksp",
+            "kspPlugin",
             "lintChecks",
             "lintPublish",
         )
@@ -89,7 +92,10 @@ class LightSdkPlugin : Plugin<Project> {
     }
 
     override fun apply(project: Project) {
-        configureInitialScreen(project)
+        project.pluginManager.withPlugin("com.google.devtools.ksp") {
+            val pluginJar = this@LightSdkPlugin::class.java.protectionDomain.codeSource.location
+            project.dependencies.add("ksp", project.files(pluginJar))
+        }
         project.afterEvaluate(::validate)
     }
 
@@ -114,74 +120,6 @@ class LightSdkPlugin : Plugin<Project> {
     }
 
     /**
-     * Find the class annotated with @InitialScreen and inject it as a manifest placeholder.
-     */
-    private fun configureInitialScreen(project: Project) {
-        if (project.name == "sdk") return
-
-        val initialScreen = findInitialScreen(project)
-        if (initialScreen != null) {
-            // Set manifest placeholder via reflection (avoids compile-time AGP dependency)
-            val android = project.extensions.findByName("android") ?: return
-            val defaultConfig = android.javaClass.getMethod("getDefaultConfig").invoke(android)
-            @Suppress("UNCHECKED_CAST")
-            val placeholders = defaultConfig.javaClass
-                .getMethod("getManifestPlaceholders")
-                .invoke(defaultConfig) as MutableMap<String, Any>
-            placeholders["lightSdkInitialScreen"] = initialScreen
-        }
-    }
-
-    /**
-     * Scan source files for a class annotated with @InitialScreen.
-     * Returns the fully qualified class name, or null if not found.
-     */
-    private fun findInitialScreen(project: Project): String? {
-        val srcDirs = project.projectDir.resolve("src")
-        if (!srcDirs.exists()) return null
-
-        val results = mutableListOf<String>()
-
-        srcDirs.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
-            .forEach { file ->
-                val lines = file.readLines()
-                var packageName = ""
-                var foundAnnotation = false
-
-                for (line in lines) {
-                    val trimmed = line.trim()
-                    if (trimmed.startsWith("package ")) {
-                        packageName = trimmed.removePrefix("package ").trim()
-                    }
-                    if (trimmed == "@InitialScreen" || trimmed.startsWith("@InitialScreen ") || trimmed.startsWith("@InitialScreen(")) {
-                        foundAnnotation = true
-                    }
-                    if (foundAnnotation && trimmed.startsWith("class ")) {
-                        val className = trimmed.removePrefix("class ")
-                            .substringBefore(" ")
-                            .substringBefore("(")
-                            .substringBefore(":")
-                            .trim()
-                        val fqcn = if (packageName.isNotEmpty()) "$packageName.$className" else className
-                        results.add(fqcn)
-                        foundAnnotation = false
-                    }
-                }
-            }
-
-        if (results.size > 1) {
-            throw GradleException(
-                "Light SDK: multiple classes annotated with @InitialScreen found:\n" +
-                results.joinToString("\n") { "  $it" } +
-                "\nOnly one initial screen is allowed."
-            )
-        }
-
-        return results.firstOrNull()
-    }
-
-    /**
      * Parse the build script file and reject disallowed plugins, buildscript blocks,
      * resolutionStrategy, and other dangerous constructs.
      */
@@ -197,7 +135,6 @@ class LightSdkPlugin : Plugin<Project> {
 
         // Check for disallowed plugin IDs
         val pluginIdPattern = Regex("""id\s*\(\s*["']([^"']+)["']\s*\)""")
-        val aliasPattern = Regex("""alias\s*\(\s*libs\.plugins\.([a-zA-Z0-9_.]+)\s*\)""")
 
         pluginIdPattern.findAll(stripped).forEach { match ->
             val pluginId = match.groupValues[1]
@@ -241,26 +178,32 @@ class LightSdkPlugin : Plugin<Project> {
 
                 lines.forEachIndexed { index, line ->
                     val lineNum = index + 1
-                    val trimmed = line.trim()
 
-                    // Check imports
-                    if (trimmed.startsWith("import ")) {
-                        val importPath = trimmed.removePrefix("import ").trim()
-                        BLOCKED_IMPORTS.forEach { blocked ->
-                            if (importPath.startsWith(blocked)) {
-                                violations.add("  $relativePath:$lineNum: blocked import '$importPath'")
+                    // Split on semicolons to handle multiple statements per line
+                    val statements = line.split(';')
+
+                    statements.forEach { statement ->
+                        val trimmed = statement.trim()
+
+                        // Check imports
+                        if (trimmed.startsWith("import ")) {
+                            val importPath = trimmed.removePrefix("import ").trim()
+                            BLOCKED_IMPORTS.forEach { blocked ->
+                                if (importPath.startsWith(blocked)) {
+                                    violations.add("  $relativePath:$lineNum: blocked import '$importPath'")
+                                }
                             }
                         }
-                    }
 
-                    // Skip comments
-                    if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return@forEachIndexed
+                        // Skip comments
+                        if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return@forEach
 
-                    // Check code patterns (only non-import lines)
-                    if (!trimmed.startsWith("import ")) {
-                        BLOCKED_CODE_PATTERNS.forEach { (pattern, message) ->
-                            if (pattern.containsMatchIn(line)) {
-                                violations.add("  $relativePath:$lineNum: $message")
+                        // Check code patterns (only non-import lines)
+                        if (!trimmed.startsWith("import ")) {
+                            BLOCKED_CODE_PATTERNS.forEach { (pattern, message) ->
+                                if (pattern.containsMatchIn(statement)) {
+                                    violations.add("  $relativePath:$lineNum: $message")
+                                }
                             }
                         }
                     }

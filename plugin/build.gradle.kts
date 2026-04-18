@@ -12,6 +12,7 @@ repositories {
 
 dependencies {
     implementation(gradleApi())
+    implementation("com.google.devtools.ksp:symbol-processing-api:2.3.6")
     testImplementation(kotlin("test"))
 }
 
