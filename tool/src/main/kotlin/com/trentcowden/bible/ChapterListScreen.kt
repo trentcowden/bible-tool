@@ -2,6 +2,8 @@ package com.trentcowden.bible
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -9,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.thelightphone.sdk.SealedLightActivity
 import com.thelightphone.sdk.SimpleLightScreen
@@ -56,20 +59,35 @@ class ChapterListScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp),
+                        .padding(horizontal = 24.dp)
+                        .padding(bottom = 24.dp),
                 ) {
-                    (1..chapterCount).forEach { chapter ->
-                        LightText(
-                            text = chapter.toString(),
-                            variant = LightTextVariant.Copy,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .lightClickable { goBack(chapter) }
-                                .padding(vertical = 12.dp),
-                        )
+                    // Lay the chapters out 5 to a row.
+                    (1..chapterCount).chunked(COLUMNS).forEach { row ->
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            row.forEach { chapter ->
+                                LightText(
+                                    text = chapter.toString(),
+                                    variant = LightTextVariant.Copy,
+                                    align = TextAlign.Center,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .lightClickable { goBack(chapter) }
+                                        .padding(vertical = 16.dp),
+                                )
+                            }
+                            // Keep the last (short) row's columns aligned with the rest.
+                            repeat(COLUMNS - row.size) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+
+    private companion object {
+        const val COLUMNS = 5
     }
 }
