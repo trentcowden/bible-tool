@@ -107,7 +107,6 @@ class BibleScreen(sealedActivity: SealedLightActivity) :
 
                 // Two items: settings on the left, the book picker on the right.
                 LightBottomBar(
-                    modifier = Modifier.padding(top = 0.dp),
                     items = listOf(
                         LightBarButton.LightIcon(
                             icon = LightIcons.SETTINGS,
