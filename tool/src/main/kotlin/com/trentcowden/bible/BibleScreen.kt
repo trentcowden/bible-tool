@@ -29,6 +29,7 @@ import com.thelightphone.sdk.ui.LightTopBarCenter
 import com.thelightphone.sdk.ui.designVerticalPxToDp
 import com.trentcowden.bible.data.BibleDbHolder
 import com.trentcowden.bible.data.ReadingPositionStore
+import com.trentcowden.bible.data.SettingsStore
 import com.trentcowden.bible.data.Verse
 
 @InitialScreen
@@ -41,11 +42,13 @@ class BibleScreen(sealedActivity: SealedLightActivity) :
     override fun createViewModel() = BibleViewModel(
         db = BibleDbHolder.get(lightContext),
         positionStore = ReadingPositionStore(lightContext.dataStore),
+        settingsStore = SettingsStore(lightContext.dataStore),
     )
 
     @Composable
     override fun Content() {
         val state by viewModel.state.collectAsState()
+        val hideVerseNumbers by viewModel.hideVerseNumbers.collectAsState()
         val themeColors by LightThemeController.colors.collectAsState()
 
         LightTheme(colors = themeColors) {
@@ -76,7 +79,7 @@ class BibleScreen(sealedActivity: SealedLightActivity) :
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp)
                 ) {
-                    val paragraphs = chapterToParagraphs(state.verses)
+                    val paragraphs = chapterToParagraphs(state.verses, hideVerseNumbers)
                     paragraphs.forEachIndexed { index, paragraph ->
                         LightText(
                             text = paragraph,
@@ -93,10 +96,16 @@ class BibleScreen(sealedActivity: SealedLightActivity) :
                     }
                 }
 
+                // Two items: settings on the left, the book picker on the right.
                 LightBottomBar(
                     modifier = Modifier.padding(top = 0.dp),
                     items = listOf(
-                        null,
+                        LightBarButton.LightIcon(
+                            icon = LightIcons.SETTINGS,
+                            onClick = {
+                                navigateTo({ activity -> SettingsScreen(activity) })
+                            },
+                        ),
                         LightBarButton.LightIcon(
                             icon = LightIcons.LIST,
                             onClick = {
@@ -112,8 +121,15 @@ class BibleScreen(sealedActivity: SealedLightActivity) :
     }
 }
 
-private fun chapterToParagraphs(verses: List<Verse>): List<String> =
-    verses.joinToString(separator = "") { "${it.verse} ${it.text}" }
+private fun chapterToParagraphs(
+    verses: List<Verse>,
+    hideVerseNumbers: Boolean,
+): List<String> =
+    verses.joinToString(separator = "") { verse ->
+        // Each verse's text already carries a trailing space (or "\n\n" to end a
+        // paragraph), so with numbers hidden the verses still read as flowing prose.
+        if (hideVerseNumbers) verse.text else "${verse.verse} ${verse.text}"
+    }
         .split("\n\n")
         .map { it.trim() }
         .filter { it.isNotEmpty() }
