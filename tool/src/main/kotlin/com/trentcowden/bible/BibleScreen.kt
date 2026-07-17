@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -51,6 +53,12 @@ class BibleScreen(sealedActivity: SealedLightActivity) :
         val hideVerseNumbers by viewModel.hideVerseNumbers.collectAsState()
         val themeColors by LightThemeController.colors.collectAsState()
 
+        // Jump back to the top whenever the chapter changes. Keyed on the reference so
+        // it fires on next/previous/goTo, but not on unrelated recompositions (e.g.
+        // toggling verse numbers, which should keep your place).
+        val scrollState = rememberScrollState()
+        LaunchedEffect(state.reference) { scrollState.scrollTo(0) }
+
         LightTheme(colors = themeColors) {
             Column(
                 modifier = Modifier
@@ -74,6 +82,7 @@ class BibleScreen(sealedActivity: SealedLightActivity) :
                 )
 
                 LightScrollView(
+                    scrollState = scrollState,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
